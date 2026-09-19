@@ -68,7 +68,9 @@ bool readNoiseDb(float& db) {
     sq += s * s;
   }
   const double rms = sqrt(sq / double(n));
-  if (rms < 1.0) { db = NOISE_DB_OFFSET - 138.0f; return true; }   // silence floor
+  // Perfect digital silence means the mic is not clocking data at all, which
+  // in practice means it is unwired. Reporting a dB number for that invents one.
+  if (rms < 1.0) return false;
 
   db = float(20.0 * log10(rms / 8388608.0)) + NOISE_DB_OFFSET;
   return true;
