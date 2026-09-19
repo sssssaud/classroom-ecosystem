@@ -79,6 +79,19 @@ bool readNoiseDb(float& db) {
 bool sensorsBegin() {
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
 
+  // Print whatever is actually on the bus. "Not found" on its own cannot tell
+  // a miswired sensor from one sitting at an address we never tried.
+  Serial.print("I2C scan:");
+  uint8_t seen = 0;
+  for (uint8_t addr = 1; addr < 127; ++addr) {
+    Wire.beginTransmission(addr);
+    if (Wire.endTransmission() == 0) {
+      Serial.printf(" 0x%02X", addr);
+      ++seen;
+    }
+  }
+  Serial.println(seen ? "" : " nothing responded (check SDA/SCL/VCC/GND)");
+
   // Breakouts ship on either address; probe both rather than make the user care.
   bme_ok = bme.begin(0x76, &Wire) || bme.begin(0x77, &Wire);
   if (bme_ok) {

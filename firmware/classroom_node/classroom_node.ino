@@ -227,10 +227,12 @@ static void startNetwork() {
     Serial.printf("SoftAP \"%s\" at %s\n", AP_SSID, WiFi.softAPIP().toString().c_str());
   } else {
     Serial.printf("WiFi %s at %s\n", WIFI_SSID, WiFi.localIP().toString().c_str());
-    if (MDNS.begin(MDNS_HOST)) {
-      MDNS.addService("http", "tcp", 80);
-      Serial.printf("http://%s.local\n", MDNS_HOST);
-    }
+  }
+  // Works in both modes: on the SoftAP the name is the only thing a phone can
+  // remember, and typing the IP is exactly what people get wrong.
+  if (MDNS.begin(MDNS_HOST)) {
+    MDNS.addService("http", "tcp", 80);
+    Serial.printf("http://%s.local\n", MDNS_HOST);
   }
 }
 
@@ -249,8 +251,16 @@ void setup() {
   startNetwork();
 
   server.on("/", HTTP_GET, [] {
+    Serial.printf("GET / from %s\n", server.client().remoteIP().toString().c_str());
     server.sendHeader("Cache-Control", "no-store");
     server.send_P(200, "text/html", INDEX_HTML);
+  });
+  // Anything else is almost always a phone probing for a captive portal; log it
+  // so "the page will not load" can be told apart from "nothing ever arrived".
+  server.onNotFound([] {
+    Serial.printf("404 %s from %s\n", server.uri().c_str(),
+                  server.client().remoteIP().toString().c_str());
+    server.send(404, "text/plain", "not found");
   });
   server.on("/api/state", HTTP_GET, handleState);
   server.on("/api/history", HTTP_GET, handleHistory);
