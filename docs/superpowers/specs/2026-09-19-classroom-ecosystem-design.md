@@ -96,17 +96,22 @@ and it cannot wedge in a half-open socket state.
   "gas_baseline_set": true,
   "burn_in_complete": false,
   "readings": {
-    "temperature_c": { "value": 24.8, "ok": true, "band": [18, 30] },
-    "humidity_pct":  { "value": 48.2, "ok": true, "band": [30, 70] },
-    "pressure_hpa":  { "value": 1008.4, "ok": true, "band": null },
-    "air_index":     { "value": 1.14, "ok": true, "band": [0, 1.5] },
-    "noise_db":      { "value": 61.0, "ok": true, "band": [0, 75] }
+    "temperature_c": { "value": 24.8,   "level": "ok", "band": [18, 30] },
+    "humidity_pct":  { "value": 48.2,   "level": "ok", "band": [30, 70] },
+    "pressure_hpa":  { "value": 1008.4, "level": "ok", "band": null },
+    "air_index":     { "value": 1.14,   "level": "ok", "band": [0, 1.5] },
+    "noise_db":      { "value": 61.0,   "level": "ok", "band": [0, 75] }
   }
 }
 ```
 
-`status` is one of `boot`, `ok`, `warn`, `alert`, `fault`. A reading that cannot
-be taken has `"value": null` and `"ok": false` — never a fabricated `0`.
+`status` is one of `boot`, `ok`, `warn`, `alert`, `fault`. Each reading also
+carries its own `level` — `ok`, `warn`, `alert` or `offline` — so a tile is
+coloured by that reading's own severity rather than the room's. A reading that
+cannot be taken has `"value": null` and `"level": "offline"`; zero is never
+substituted. Only the air index escalates to `alert`; every other reading tops
+out at `warn`, and an optional `note` carries short text such as "above range"
+so severity is never conveyed by colour alone.
 
 ### Timing and memory
 
