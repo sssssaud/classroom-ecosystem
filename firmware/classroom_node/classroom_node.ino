@@ -1,0 +1,274 @@
+// Classroom environment node: reads the room, shows it on three LEDs, and
+// serves its own dashboard. No cloud, no laptop, no SD card.
+#include <WiFi.h>
+#include <WebServer.h>
+#include <ESPmDNS.h>
+
+#include "config.h"
+#include "status.h"
+#include "history.h"
+#include "sensors.h"
+#include "page.h"
+#if __has_include("secrets.h")
+#include "secrets.h"
+#else
+#define WIFI_SSID ""
+#define WIFI_PASS ""
+#endif
+
+static const char* KEYS[R_COUNT] = {
+  "temperature_c", "humidity_pct", "pressure_hpa", "air_index", "noise_db"
+};
+
+static Thresholds thresholds() {
+  Thresholds t;
+  t.temp_lo = TEMP_LO;  t.temp_hi = TEMP_HI;
+  t.hum_lo  = HUM_LO;   t.hum_hi  = HUM_HI;
+  t.noise_hi = NOISE_HI;
+  t.air_warn = AIR_WARN; t.air_alert = AIR_ALERT;
+  t.release = RELEASE_FRAC;
+  t.band_margin = BAND_MARGIN;
+  t.dwell_ms = DWELL_MS;
+  return t;
+}
+
+static StatusEngine engine(thresholds());
+static int16_t hist_storage[HISTORY_CAPACITY * R_COUNT];
+static History history(hist_storage, HISTORY_CAPACITY);
+static WebServer server(80);
+
+static Readings latest;
+static StatusOut latest_out;
+static uint32_t last_sample_ms = 0;
+static uint32_t last_history_ms = 0;
+static bool ap_mode = false;
+
+// ---------------------------------------------------------------- indicators
+
+// Green = normal, red = gas alert, blue = powered and running. A fault blinks
+// red so it is not mistaken for a steady gas alert.
+static void drawIndicators(const StatusOut& o, uint32_t now_ms) {
+  const bool blink = (now_ms / 500) % 2;
+  digitalWrite(PIN_LED_BLUE, HIGH);
+  digitalWrite(PIN_LED_GREEN, o.state == ST_OK ? HIGH : LOW);
+  digitalWrite(PIN_LED_RED,
+               o.state == ST_ALERT ? HIGH : (o.state == ST_FAULT && blink ? HIGH : LOW));
+
+  // Intermittent, not continuous: a solid tone gets taped over within a day.
+  if (o.buzzer && (now_ms % 2000) < 250) tone(PIN_BUZZER, 2000);
+  else noTone(PIN_BUZZER);
+}
+
+// ---------------------------------------------------------------------- JSON
+
+static void appendFloat(String& s, float v, int dp) {
+  char buf[16];
+  dtostrf(v, 0, dp, buf);
+  s += buf;
+}
+
+static const char* levelName(Level l) {
+  switch (l) {
+    case LVL_OK:    return "ok";
+    case LVL_WARN:  return "warn";
+    case LVL_ALERT: return "alert";
+    default:        return "offline";
+  }
+}
+
+static const char* stateName(RoomState s) {
+  switch (s) {
+    case ST_OK:    return "ok";
+    case ST_WARN:  return "warn";
+    case ST_ALERT: return "alert";
+    case ST_FAULT: return "fault";
+    default:       return "boot";
+  }
+}
+
+static const char* message(RoomState s, bool baseline_set) {
+  if (!baseline_set) return "Running, but the air index needs a clean-air baseline";
+  switch (s) {
+    case ST_OK:    return "Classroom conditions are normal";
+    case ST_WARN:  return "Conditions outside the comfortable range";
+    case ST_ALERT: return "Gas level high \xE2\x80\x94 ventilate the room";
+    case ST_FAULT: return "A sensor stopped responding";
+    default:       return "Starting up \xE2\x80\x94 warming the gas sensor";
+  }
+}
+
+static void bandJson(String& s, ReadingId id) {
+  switch (id) {
+    case R_TEMP:  s += "[18,30]"; break;
+    case R_HUM:   s += "[30,70]"; break;
+    case R_AIR:   s += "[0,1.5]"; break;
+    case R_NOISE: s += "[0,75]";  break;
+    default:      s += "null";    break;   // pressure has no comfort band
+  }
+}
+
+static int dpOf(ReadingId id) {
+  if (id == R_AIR) return 2;
+  if (id == R_TEMP) return 1;
+  return 0;
+}
+
+static void handleState() {
+  const uint32_t now = millis();
+  String s;
+  s.reserve(900);
+  s += "{\"uptime_s\":";
+  s += now / 1000;
+  s += ",\"status\":\"";
+  s += stateName(latest_out.state);
+  s += "\",\"message\":\"";
+  s += message(latest_out.state, baselineSet());
+  s += "\",\"muted_until_s\":";
+  s += engine.muteRemainingMs(now) / 1000;
+  s += ",\"gas_baseline_set\":";
+  s += baselineSet() ? "true" : "false";
+  s += ",\"burn_in_complete\":";
+  s += (now >= BURN_IN_MS) ? "true" : "false";
+  s += ",\"readings\":{";
+
+  for (uint8_t i = 0; i < R_COUNT; ++i) {
+    const ReadingId id = ReadingId(i);
+    if (i) s += ',';
+    s += '"'; s += KEYS[i]; s += "\":{\"value\":";
+    // A dead sensor reports null, never 0 — a zero would read as a real value.
+    if (latest.v[i].valid) appendFloat(s, latest.v[i].value, dpOf(id));
+    else s += "null";
+    s += ",\"level\":\""; s += levelName(latest_out.level[i]);
+    s += "\",\"band\":"; bandJson(s, id);
+    if (id == R_AIR && !baselineSet())      s += ",\"note\":\"baseline not set\"";
+    else if (!latest.v[i].valid)            s += ",\"note\":\"no response\"";
+    s += '}';
+  }
+  s += "}}";
+
+  server.sendHeader("Cache-Control", "no-store");
+  server.send(200, "application/json", s);
+}
+
+// 1080 points x 5 series is far too big for one String, so stream it.
+static void handleHistory() {
+  server.sendHeader("Cache-Control", "no-store");
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  server.send(200, "application/json", "");
+
+  String head = "{\"interval_s\":";
+  head += HISTORY_INTERVAL_MS / 1000;
+  head += ",\"count\":";
+  head += history.size();
+  head += ",\"series\":{";
+  server.sendContent(head);
+
+  for (uint8_t f = 0; f < R_COUNT; ++f) {
+    const ReadingId id = ReadingId(f);
+    String chunk;
+    chunk.reserve(1024);
+    if (f) chunk += ',';
+    chunk += '"'; chunk += KEYS[f]; chunk += "\":[";
+
+    for (uint16_t i = 0; i < history.size(); ++i) {
+      if (i) chunk += ',';
+      const int16_t raw = history.at(i, id);
+      if (raw == HIST_MISSING) chunk += "null";   // the chart breaks the line here
+      else appendFloat(chunk, raw / History::scaleOf(id), dpOf(id));
+
+      if (chunk.length() > 900) { server.sendContent(chunk); chunk = ""; }
+    }
+    chunk += ']';
+    server.sendContent(chunk);
+  }
+  server.sendContent("}}");
+  server.sendContent("");
+}
+
+static void handleMute() {
+  engine.mute(millis());
+  String s = "{\"muted_until_s\":";
+  s += engine.muteRemainingMs(millis()) / 1000;
+  s += '}';
+  server.send(200, "application/json", s);
+}
+
+static void handleCalibrate() {
+  startCalibration(millis());
+  String s = "{\"calibrating_s\":";
+  s += CALIBRATE_MS / 1000;
+  s += '}';
+  server.send(200, "application/json", s);
+}
+
+// ---------------------------------------------------------------------- boot
+
+static void startNetwork() {
+  if (strlen(WIFI_SSID) > 0) {
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
+    const uint32_t started = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - started < WIFI_TIMEOUT_MS) {
+      delay(250);
+    }
+  }
+  // No credentials, or the room's WiFi is down: still serve the dashboard from
+  // our own access point rather than becoming a box with three blinking lights.
+  if (WiFi.status() != WL_CONNECTED) {
+    ap_mode = true;
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(AP_SSID);
+    Serial.printf("SoftAP \"%s\" at %s\n", AP_SSID, WiFi.softAPIP().toString().c_str());
+  } else {
+    Serial.printf("WiFi %s at %s\n", WIFI_SSID, WiFi.localIP().toString().c_str());
+    if (MDNS.begin(MDNS_HOST)) {
+      MDNS.addService("http", "tcp", 80);
+      Serial.printf("http://%s.local\n", MDNS_HOST);
+    }
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(PIN_LED_GREEN, OUTPUT);
+  pinMode(PIN_LED_BLUE, OUTPUT);
+  pinMode(PIN_LED_RED, OUTPUT);
+  pinMode(PIN_BUZZER, OUTPUT);
+  digitalWrite(PIN_LED_BLUE, HIGH);
+
+  if (!sensorsBegin()) Serial.println("BME280 not found on 0x76 or 0x77");
+  engine.setMuteDuration(MUTE_DURATION_MS);
+
+  startNetwork();
+
+  server.on("/", HTTP_GET, [] {
+    server.sendHeader("Cache-Control", "no-store");
+    server.send_P(200, "text/html", INDEX_HTML);
+  });
+  server.on("/api/state", HTTP_GET, handleState);
+  server.on("/api/history", HTTP_GET, handleHistory);
+  server.on("/api/mute", HTTP_POST, handleMute);
+  server.on("/api/calibrate", HTTP_POST, handleCalibrate);
+  server.begin();
+}
+
+void loop() {
+  server.handleClient();
+  const uint32_t now = millis();
+
+  if (now - last_sample_ms >= SAMPLE_INTERVAL_MS) {
+    last_sample_ms = now;
+    Readings r;                       // fresh each time: stale values never linger
+    sensorsRead(r, now);
+    latest = r;
+    latest_out = engine.update(r, now, baselineSet());
+  }
+
+  if (now - last_history_ms >= HISTORY_INTERVAL_MS) {
+    last_history_ms = now;
+    history.push(latest);
+  }
+
+  drawIndicators(latest_out, now);
+}

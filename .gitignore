@@ -1,7 +1,7 @@
 # secrets
 .env
 *.pem
-firmware/include/secrets.h
+firmware/classroom_node/secrets.h
 
 # python
 __pycache__/
@@ -22,3 +22,7 @@ firmware/.pio/
 .DS_Store
 .idea/
 .vscode/
+
+# arduino-cli build output
+build/
+firmware/build/
