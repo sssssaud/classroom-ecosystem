@@ -58,7 +58,7 @@ static const uint16_t I2S_FRAMES      = 512;
 // dB here is NOT calibrated SPL. We report dBFS + offset; the offset is a pure
 // fudge factor. Hold a phone sound-level meter next to the box and shift this
 // until the numbers agree. ponytail: one knob beats a calibration routine.
-static const float NOISE_DB_OFFSET = 100.0f;
+static const float NOISE_DB_OFFSET = 107.0f;
 
 // ---- history ----
 static const uint16_t HISTORY_CAPACITY = 1080;  // 3 h at one record per 10 s

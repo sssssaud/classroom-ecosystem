@@ -16,11 +16,13 @@ No laptop, no server, no cloud.
 - `docs/superpowers/specs/` — the approved design spec.
 - `ui/index.html` — the dashboard. Self-contained; the ESP32 serves this verbatim.
 - `ui/serve.py` — mock ESP32 (stdlib only) so the UI can be built with no hardware.
-- `firmware/` — PlatformIO project (not yet written).
+- `firmware/classroom_node/` — the firmware (arduino-cli, ESP32 core 3.x).
+- `firmware/diagnose/` — per-device bring-up check: I2C scan, ADC, I2S, LEDs, buzzer.
+- `firmware/test/` — host tests for the pure modules, plain g++, no board.
 
 ## Stack
 - ESP32 (BME280 on I²C, MQ-135 on ADC1/GPIO34, INMP441 on I²S, 3 LEDs, buzzer).
-- Firmware: Arduino framework via PlatformIO. `status` and `history` are pure
+- Firmware: Arduino framework via arduino-cli. `status` and `history` are pure
   C++ with no Arduino calls so they unit-test on the laptop.
 - UI: no framework, no CDN, no chart library — the ESP32 serves it offline.
 - No GPU/ML involved; the 6GB VRAM ceiling is irrelevant here.
@@ -29,7 +31,9 @@ No laptop, no server, no cloud.
 - Dashboard (no hardware): `python3 ui/serve.py` then open http://localhost:8000
 - Contract check: `python3 ui/serve.py --selftest`
 - Force a UI state: open `?s=warn` / `?s=alert` / `?s=fault` / `?s=nobaseline` / `?s=boot`
-- Firmware: `pio run -t upload` (once `firmware/` exists)
+- Firmware: `arduino-cli compile --fqbn esp32:esp32:esp32 firmware/classroom_node`
+  then `arduino-cli upload -p /dev/ttyUSB0 --fqbn esp32:esp32:esp32 firmware/classroom_node`
+- Host tests: `g++ -std=c++17 -Ifirmware/classroom_node firmware/test/test_status.cpp firmware/classroom_node/status.cpp firmware/classroom_node/history.cpp -o /tmp/t && /tmp/t`
 
 ## Current status
 - Done: design spec approved; dashboard built and verified against mock data in

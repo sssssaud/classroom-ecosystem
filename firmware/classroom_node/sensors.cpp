@@ -106,9 +106,29 @@ bool sensorsBegin() {
 
   analogSetPinAttenuation(PIN_MQ135_AO, ADC_11db);
 
-  i2s.setPins(PIN_I2S_BCLK, PIN_I2S_WS, -1, PIN_I2S_DIN, -1);
-  i2s_ok = i2s.begin(I2S_MODE_STD, I2S_SAMPLE_RATE, I2S_DATA_BIT_WIDTH_32BIT,
-                     I2S_SLOT_MODE_MONO, I2S_STD_SLOT_LEFT);
+  // Which slot the INMP441 speaks on depends on how its L/R pin is strapped,
+  // and a mismatch reads as perfect silence rather than as an error. Try both
+  // and keep the one that actually carries samples.
+  i2s_ok = false;
+  for (uint8_t attempt = 0; attempt < 2 && !i2s_ok; ++attempt) {
+    const i2s_std_slot_mask_t slot = attempt ? I2S_STD_SLOT_RIGHT : I2S_STD_SLOT_LEFT;
+    i2s.end();
+    i2s.setPins(PIN_I2S_BCLK, PIN_I2S_WS, -1, PIN_I2S_DIN, -1);
+    if (!i2s.begin(I2S_MODE_STD, I2S_SAMPLE_RATE, I2S_DATA_BIT_WIDTH_32BIT,
+                   I2S_SLOT_MODE_MONO, slot)) {
+      continue;
+    }
+    static int32_t probe[256];
+    i2s.readBytes(reinterpret_cast<char*>(probe), sizeof(probe));   // settle
+    delay(30);
+    const size_t n = i2s.readBytes(reinterpret_cast<char*>(probe), sizeof(probe))
+                     / sizeof(int32_t);
+    for (size_t i = 0; i < n && !i2s_ok; ++i) {
+      if (probe[i] >> 8) i2s_ok = true;
+    }
+    if (i2s_ok) Serial.printf("I2S: mic found on %s slot\n", attempt ? "RIGHT" : "LEFT");
+  }
+  if (!i2s_ok) Serial.println("I2S: no mic data on either slot (check SD/GPIO33)");
 
   prefs.begin("classroom", false);
   r0_ = prefs.getFloat("mq_r0", 0.0f);
