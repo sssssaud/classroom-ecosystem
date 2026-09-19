@@ -36,8 +36,15 @@ No laptop, no server, no cloud.
 - Host tests: `g++ -std=c++17 -Ifirmware/classroom_node firmware/test/test_status.cpp firmware/classroom_node/status.cpp firmware/classroom_node/history.cpp -o /tmp/t && /tmp/t`
 
 ## Current status
-- Done: design spec approved; dashboard built and verified against mock data in
-  light and dark, normal/warn/alert/fault states.
-- Pending: firmware — sensor drivers, pure `status`/`history` modules with host
-  unit tests, then integration.
-- Blockers: none. MQ-135 needs 24–48 h burn-in before its readings mean anything.
+- Done: spec, dashboard, firmware, host tests. Flashed and verified on hardware:
+  all five tiles live, history streaming, LEDs and buzzer on the agreed cadence.
+- MQ-135 (GPIO34) and INMP441 (I2S) are confirmed working against the board.
+  The mic transmits on the RIGHT slot because its L/R pin is strapped high;
+  `sensorsBegin` probes both slots, so either strapping works.
+- **No BME280 is fitted.** Nothing answers anywhere on the I2C bus, on either
+  pin order — a wiring or power fault, not an address or driver problem. Until
+  one is fitted, `sensorsRead` synthesizes temperature/humidity/pressure and
+  every path labels them `simulated`; the branch is skipped the moment a real
+  BME280 answers at boot. These are not measurements. See `firmware/diagnose`.
+- Blockers: none. MQ-135 needs 24–48 h burn-in before its readings mean
+  anything, so re-run Calibrate in clean air once the board has been on a while.

@@ -93,6 +93,7 @@ static const char* stateName(RoomState s) {
 }
 
 static const char* message(RoomState s, bool baseline_set) {
+  if (bmeSimulated()) return "Demo mode: comfort readings are simulated, no BME280 fitted";
   if (!baseline_set) return "Running, but the air index needs a clean-air baseline";
   switch (s) {
     case ST_OK:    return "Classroom conditions are normal";
@@ -148,6 +149,9 @@ static void handleState() {
     s += "\",\"band\":"; bandJson(s, id);
     if (id == R_AIR && !baselineSet())      s += ",\"note\":\"baseline not set\"";
     else if (!latest.v[i].valid)            s += ",\"note\":\"no response\"";
+    // Synthetic values must never reach the page looking like measurements.
+    else if (bmeSimulated() && (id == R_TEMP || id == R_HUM || id == R_PRESS))
+      s += ",\"note\":\"simulated - no BME280 fitted\"";
     s += '}';
   }
   s += "}}";

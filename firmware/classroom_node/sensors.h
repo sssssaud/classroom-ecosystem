@@ -11,6 +11,10 @@ bool sensorsBegin();
 // Fills every channel. Any sensor that fails sets valid=false — never 0.
 void sensorsRead(Readings& out, uint32_t now_ms);
 
+// True when no BME280 answered, so temperature/humidity/pressure are synthetic.
+// Callers must label those readings; they are not measurements.
+bool bmeSimulated();
+
 // ---- MQ-135 clean-air baseline ----
 bool  baselineSet();
 float baselineR0();

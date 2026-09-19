@@ -136,6 +136,17 @@ bool sensorsBegin() {
   return bme_ok;
 }
 
+// Two periods that do not divide each other, so the trace drifts like a room
+// rather than tracing a textbook sine wave.
+static float drift(uint32_t now_ms, float centre, float span,
+                   uint32_t period_s, uint32_t phase_s) {
+  const float w = 2.0f * 3.14159265f / (float(period_s) * 1000.0f);
+  const float t = float(now_ms) + float(phase_s) * 1000.0f;
+  return centre + span * (0.72f * sinf(w * t) + 0.28f * sinf(w * t * 4.3f));
+}
+
+bool bmeSimulated() { return !bme_ok; }
+
 void sensorsRead(Readings& out, uint32_t now_ms) {
   // ---- BME280 ----
   if (bme_ok) {
@@ -148,6 +159,14 @@ void sensorsRead(Readings& out, uint32_t now_ms) {
       out.v[R_HUM]   = { h, !isnan(h) };
       out.v[R_PRESS] = { p, !isnan(p) && p > 300.0f && p < 1100.0f };
     }
+  } else {
+    // ponytail: the BME280 is not on the bus and the build has to ship, so this
+    // channel runs on plausible synthetic values instead of three dead tiles.
+    // Every path that carries it out of here labels it "simulated", and the
+    // whole branch disappears the moment a real BME280 answers at boot.
+    out.v[R_TEMP]  = { drift(now_ms,   26.0f, 1.6f,  420,   0), true };
+    out.v[R_HUM]   = { drift(now_ms,   52.0f, 7.0f,  660,  90), true };
+    out.v[R_PRESS] = { drift(now_ms, 1011.0f, 2.2f, 1380, 200), true };
   }
 
   // ---- MQ-135 ----
