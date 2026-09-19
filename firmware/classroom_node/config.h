@@ -47,6 +47,8 @@ static const float MQ_VCC     = 5.0f;      // sensor heater/divider supply
 static const float MQ_LOAD_R  = 10000.0f;  // RL on the breakout board
 static const float ADC_REF_V  = 3.3f;      // ESP32 ADC full scale at 11 dB
 static const int   ADC_MAX    = 4095;
+// Baseline creep per sample; 0.0017 at a 2 s sample is a ~20 min time constant.
+static const float MQ_R0_CREEP  = 0.0017f;
 static const float MQ_EMA_ALPHA  = 0.05f;   // heavy smoothing; raw ADC is noisy
 // First-order correction: MQ sensors read high when warm and humid.
 static const float MQ_TEMP_COEFF = -0.012f;  // per degree C from 20C

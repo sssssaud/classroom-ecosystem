@@ -42,10 +42,14 @@ No laptop, no server, no cloud.
 - MQ-135 (GPIO34) and INMP441 (I2S) are confirmed working against the board.
   The mic transmits on the RIGHT slot because its L/R pin is strapped high;
   `sensorsBegin` probes both slots, so either strapping works.
-- **No BME280 is fitted.** Nothing answers anywhere on the I2C bus, on either
-  pin order — a wiring or power fault, not an address or driver problem. Until
-  one is fitted, `sensorsRead` synthesizes temperature/humidity/pressure and
-  every path labels them `simulated`; the branch is skipped the moment a real
-  BME280 answers at boot. These are not measurements. See `firmware/diagnose`.
+- **The comfort sensor is a BMP280, not a BME280** (chip ID 0x58, same
+  footprint). Temperature and pressure are real; it has no humidity die, so
+  humidity is the one synthetic channel and every path labels it `simulated`.
+- The MQ-135 is **not burned in**, so its clean-air resistance wanders
+  several-fold over hours. The baseline creeps after it (`MQ_R0_CREEP`,
+  ~20 min time constant) so drift never trips the alarm but a gas puff still
+  does. Send `c` on the serial line to recalibrate without a network.
+- **`firmware/classroom_node/secrets.h` is absent**, so the box runs its
+  SoftAP (`classroom-node`, 192.168.4.1). Add the file to put it on the LAN.
 - Blockers: none. MQ-135 needs 24–48 h burn-in before its readings mean
   anything, so re-run Calibrate in clean air once the board has been on a while.

@@ -134,6 +134,10 @@ static void handleState() {
   s += engine.muteRemainingMs(now) / 1000;
   s += ",\"gas_baseline_set\":";
   s += baselineSet() ? "true" : "false";
+  s += ",\"mq_r0\":";
+  s += mqR0();
+  s += ",\"mq_rs\":";
+  s += mqRsEma();
   s += ",\"burn_in_complete\":";
   s += (now >= BURN_IN_MS) ? "true" : "false";
   s += ",\"readings\":{";
@@ -274,6 +278,11 @@ void setup() {
 
 void loop() {
   server.handleClient();
+  // Bring-up without a network: 'c' recalibrates, matching the dashboard button.
+  if (Serial.available() && Serial.read() == 'c') {
+    startCalibration(millis());
+    Serial.println("MQ: calibrating for 60 s, keep the air clean");
+  }
   const uint32_t now = millis();
 
   if (now - last_sample_ms >= SAMPLE_INTERVAL_MS) {
@@ -282,6 +291,14 @@ void loop() {
     sensorsRead(r, now);
     latest = r;
     latest_out = engine.update(r, now, baselineSet());
+    // Headless heartbeat: the box has no screen, and on the SoftAP the serial
+    // line is the only way to see what it decided.
+    static const char* kState[] = {"BOOT","OK","WARN","ALERT","FAULT"};
+    Serial.printf("[%lus] %-5s air=%.2f temp=%.1f noise=%.0f r0=%.0f\n",
+                  now / 1000UL, kState[latest_out.state],
+                  r.v[R_AIR].valid ? r.v[R_AIR].value : -1.0f,
+                  r.v[R_TEMP].valid ? r.v[R_TEMP].value : -1.0f,
+                  r.v[R_NOISE].valid ? r.v[R_NOISE].value : -1.0f, mqR0());
   }
 
   if (now - last_history_ms >= HISTORY_INTERVAL_MS) {

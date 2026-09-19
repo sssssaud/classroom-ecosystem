@@ -19,6 +19,8 @@ bool anySimulated();
 
 // ---- MQ-135 clean-air baseline ----
 bool  baselineSet();
+float mqR0();
+float mqRsEma();
 float baselineR0();
 void  startCalibration(uint32_t now_ms);
 bool  calibrating(uint32_t now_ms);

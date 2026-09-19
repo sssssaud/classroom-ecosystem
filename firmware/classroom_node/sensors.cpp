@@ -238,6 +238,7 @@ void sensorsRead(Readings& out, uint32_t now_ms) {
       ++cal_n_;
     } else if (cal_n_ > 0) {                 // window just closed
       r0_ = float(cal_sum_ / double(cal_n_));
+      Serial.printf("MQ: baseline closed, n=%u r0=%.0f\n", cal_n_, r0_);
       prefs.putFloat("mq_r0", r0_);
       cal_sum_ = 0.0;
       cal_n_ = 0;
@@ -245,6 +246,12 @@ void sensorsRead(Readings& out, uint32_t now_ms) {
 
     // Index is R0/Rs: resistance falls as gas rises, so the number rises with
     // gas. 1.0 means "same as the clean air you calibrated in".
+    // The sensor is not burned in: its clean-air resistance wanders several-fold
+    // over hours. Let the baseline creep after it (tau ~20 min) so slow drift
+    // never trips the alarm, while a gas puff -- seconds, not hours -- still does.
+    // Not persisted: NVS would not survive a write every sample.
+    if (r0_ > 0.0f && !calibrating(now_ms)) r0_ += (rs_ema_ - r0_) * MQ_R0_CREEP;
+
     if (r0_ > 0.0f && rs_ema_ > 0.0f) {
       out.v[R_AIR] = { r0_ / rs_ema_, true };
     }
@@ -256,6 +263,9 @@ void sensorsRead(Readings& out, uint32_t now_ms) {
 }
 
 bool  baselineSet()  { return r0_ > 0.0f; }
+// ponytail: raw baseline numbers on the API so the index can be debugged without serial.
+float mqR0()         { return r0_; }
+float mqRsEma()      { return rs_ema_; }
 float baselineR0()   { return r0_; }
 
 void startCalibration(uint32_t now_ms) {
