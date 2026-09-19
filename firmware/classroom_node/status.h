@@ -18,7 +18,10 @@ struct Readings {
 };
 
 struct Thresholds {
-  float temp_lo = 18.0f, temp_hi = 30.0f;
+  // 18-30 is an air-conditioned office band. This room runs at 30 C in
+  // September with the fans on, and the BMP280 sits on the board so it reads
+  // a little high. Flagging that as discomfort is noise, not information.
+  float temp_lo = 18.0f, temp_hi = 34.0f;
   float hum_lo = 30.0f,  hum_hi = 70.0f;
   float noise_hi = 75.0f;
   float air_warn = 1.5f, air_alert = 2.5f;

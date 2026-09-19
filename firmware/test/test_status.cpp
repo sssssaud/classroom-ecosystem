@@ -7,7 +7,10 @@
 
 namespace {
 
-const Thresholds T;   // defaults are what the firmware ships with
+// Pinned to the values these tests were written against: they exercise the
+// state machine, not the comfort tuning, which moves with the room.
+Thresholds pinned() { Thresholds t; t.temp_hi = 30.0f; return t; }
+const Thresholds T = pinned();
 
 // A room that is comfortable on every channel.
 Readings calm() {

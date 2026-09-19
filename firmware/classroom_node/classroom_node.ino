@@ -294,11 +294,11 @@ void loop() {
     // Headless heartbeat: the box has no screen, and on the SoftAP the serial
     // line is the only way to see what it decided.
     static const char* kState[] = {"BOOT","OK","WARN","ALERT","FAULT"};
-    Serial.printf("[%lus] %-5s air=%.2f temp=%.1f noise=%.0f r0=%.0f\n",
+    Serial.printf("[%lus] %-5s air=%.2f temp=%.1f noise=%.0f r0=%.0f rs=%.0f\n",
                   now / 1000UL, kState[latest_out.state],
                   r.v[R_AIR].valid ? r.v[R_AIR].value : -1.0f,
                   r.v[R_TEMP].valid ? r.v[R_TEMP].value : -1.0f,
-                  r.v[R_NOISE].valid ? r.v[R_NOISE].value : -1.0f, mqR0());
+                  r.v[R_NOISE].valid ? r.v[R_NOISE].value : -1.0f, mqR0(), mqRsEma());
   }
 
   if (now - last_history_ms >= HISTORY_INTERVAL_MS) {
