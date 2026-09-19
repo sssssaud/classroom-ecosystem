@@ -93,7 +93,7 @@ static const char* stateName(RoomState s) {
 }
 
 static const char* message(RoomState s, bool baseline_set) {
-  if (bmeSimulated()) return "Demo mode: comfort readings are simulated, no BME280 fitted";
+  if (anySimulated()) return "Running - the tiles marked simulated have no sensor behind them";
   if (!baseline_set) return "Running, but the air index needs a clean-air baseline";
   switch (s) {
     case ST_OK:    return "Classroom conditions are normal";
@@ -150,8 +150,7 @@ static void handleState() {
     if (id == R_AIR && !baselineSet())      s += ",\"note\":\"baseline not set\"";
     else if (!latest.v[i].valid)            s += ",\"note\":\"no response\"";
     // Synthetic values must never reach the page looking like measurements.
-    else if (bmeSimulated() && (id == R_TEMP || id == R_HUM || id == R_PRESS))
-      s += ",\"note\":\"simulated - no BME280 fitted\"";
+    else if (channelSimulated(id)) s += ",\"note\":\"simulated - no sensor for this\"";
     s += '}';
   }
   s += "}}";
@@ -249,7 +248,7 @@ void setup() {
   pinMode(PIN_BUZZER, OUTPUT);
   digitalWrite(PIN_LED_BLUE, HIGH);
 
-  if (!sensorsBegin()) Serial.println("BME280 not found on 0x76 or 0x77");
+  sensorsBegin();   // prints which chip it found, or that none answered
   engine.setMuteDuration(MUTE_DURATION_MS);
 
   startNetwork();

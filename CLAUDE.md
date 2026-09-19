@@ -12,7 +12,8 @@ readings plus three hours of history, with the LEDs matching what the page says.
 No laptop, no server, no cloud.
 
 ## Directory map
-- `docs/pinout.jpeg` — the as-wired pinout photo, source of truth for GPIO.
+- `docs/pinout.jpeg` — the as-wired pinout photo.
+- `docs/wiring.md` — rails, the MQ-135 divider, and the three wiring quirks this build has.
 - `docs/superpowers/specs/` — the approved design spec.
 - `ui/index.html` — the dashboard. Self-contained; the ESP32 serves this verbatim.
 - `ui/serve.py` — mock ESP32 (stdlib only) so the UI can be built with no hardware.

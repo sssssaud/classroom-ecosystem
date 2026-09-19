@@ -4,6 +4,7 @@
 #include <Wire.h>
 #include <Preferences.h>
 #include <Adafruit_BME280.h>
+#include <Adafruit_BMP280.h>
 #include <ESP_I2S.h>
 #include <math.h>
 
@@ -13,6 +14,9 @@ namespace {
 
 Adafruit_BME280 bme;
 bool bme_ok = false;
+
+Adafruit_BMP280 bmp;   // same footprint and addresses, no humidity die
+bool bmp_ok = false;
 
 I2SClass i2s;
 bool i2s_ok = false;
@@ -78,8 +82,29 @@ bool readNoiseDb(float& db) {
 
 }  // namespace
 
+// True if anything at all answers on this pin order.
+static bool busHasDevices(int sda, int scl) {
+  Wire.end();
+  Wire.begin(sda, scl);
+  Wire.setClock(100000);          // long dupont wires are marginal at 400 kHz
+  for (uint8_t a = 1; a < 127; ++a) {
+    Wire.beginTransmission(a);
+    if (Wire.endTransmission() == 0) return true;
+  }
+  return false;
+}
+
 bool sensorsBegin() {
-  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
+  // SDA/SCL are easy to cross on a breadboard, and a crossed pair looks exactly
+  // like a dead sensor. Try the wired order, then the other one.
+  if (!busHasDevices(PIN_I2C_SDA, PIN_I2C_SCL)) {
+    if (busHasDevices(PIN_I2C_SCL, PIN_I2C_SDA)) {
+      Serial.println("I2C: nothing on the wired order, using SDA/SCL swapped");
+    } else {
+      Wire.end();
+      Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
+    }
+  }
 
   // Print whatever is actually on the bus. "Not found" on its own cannot tell
   // a miswired sensor from one sitting at an address we never tried.
@@ -102,6 +127,20 @@ bool sensorsBegin() {
                     Adafruit_BME280::SAMPLING_X1,   // pressure
                     Adafruit_BME280::SAMPLING_X1,   // humidity
                     Adafruit_BME280::FILTER_OFF);
+    Serial.println("BME280 found: temperature, humidity and pressure are real");
+  } else {
+    // Boards sold as "BME280" are very often BMP280: same footprint, same
+    // addresses, no humidity die inside. Use it for what it does have.
+    bmp_ok = bmp.begin(0x76, BMP280_CHIPID) || bmp.begin(0x77, BMP280_CHIPID);
+    if (bmp_ok) {
+      bmp.setSampling(Adafruit_BMP280::MODE_FORCED,
+                      Adafruit_BMP280::SAMPLING_X1,   // temperature
+                      Adafruit_BMP280::SAMPLING_X1,   // pressure
+                      Adafruit_BMP280::FILTER_OFF);
+      Serial.println("BMP280 found: temperature and pressure real, NO humidity sensor");
+    } else {
+      Serial.println("No BME/BMP280 on the bus: comfort channel is simulated");
+    }
   }
 
   analogSetPinAttenuation(PIN_MQ135_AO, ADC_11db);
@@ -145,7 +184,15 @@ static float drift(uint32_t now_ms, float centre, float span,
   return centre + span * (0.72f * sinf(w * t) + 0.28f * sinf(w * t * 4.3f));
 }
 
-bool bmeSimulated() { return !bme_ok; }
+// Which channels carry synthetic values. Humidity needs the BME280's extra
+// die, so a BMP280 can never supply it however well it is wired.
+bool channelSimulated(ReadingId id) {
+  if (id == R_HUM) return !bme_ok;
+  if (id == R_TEMP || id == R_PRESS) return !bme_ok && !bmp_ok;
+  return false;
+}
+
+bool anySimulated() { return !bme_ok; }
 
 void sensorsRead(Readings& out, uint32_t now_ms) {
   // ---- BME280 ----
@@ -159,11 +206,21 @@ void sensorsRead(Readings& out, uint32_t now_ms) {
       out.v[R_HUM]   = { h, !isnan(h) };
       out.v[R_PRESS] = { p, !isnan(p) && p > 300.0f && p < 1100.0f };
     }
+  } else if (bmp_ok) {
+    if (bmp.takeForcedMeasurement()) {
+      const float t = bmp.readTemperature();
+      const float p = bmp.readPressure() / 100.0f;
+      out.v[R_TEMP]  = { t, !isnan(t) };
+      out.v[R_PRESS] = { p, !isnan(p) && p > 300.0f && p < 1100.0f };
+    }
+    // ponytail: this chip has no humidity die, so that one channel stays
+    // synthetic. channelSimulated() labels it all the way to the dashboard.
+    out.v[R_HUM] = { drift(now_ms, 52.0f, 7.0f, 660, 90), true };
   } else {
-    // ponytail: the BME280 is not on the bus and the build has to ship, so this
-    // channel runs on plausible synthetic values instead of three dead tiles.
-    // Every path that carries it out of here labels it "simulated", and the
-    // whole branch disappears the moment a real BME280 answers at boot.
+    // ponytail: nothing answered on the bus and the build has to ship, so the
+    // comfort channel runs on plausible synthetic values instead of three dead
+    // tiles. Every path out of here labels them, and the branch disappears the
+    // moment a real sensor answers at boot.
     out.v[R_TEMP]  = { drift(now_ms,   26.0f, 1.6f,  420,   0), true };
     out.v[R_HUM]   = { drift(now_ms,   52.0f, 7.0f,  660,  90), true };
     out.v[R_PRESS] = { drift(now_ms, 1011.0f, 2.2f, 1380, 200), true };
