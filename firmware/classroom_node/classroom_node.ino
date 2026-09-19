@@ -45,17 +45,23 @@ static bool ap_mode = false;
 
 // ---------------------------------------------------------------- indicators
 
-// Green = normal, red = gas alert, blue = powered and running. A fault blinks
-// red so it is not mistaken for a steady gas alert.
+// Blue: on whenever the node has power. Green: blinks steadily while the room
+// is normal, dark the instant it is not. Red: a two-pulse alarm cadence, so a
+// gas alert cannot be mistaken for green's calm heartbeat across the room.
 static void drawIndicators(const StatusOut& o, uint32_t now_ms) {
-  const bool blink = (now_ms / 500) % 2;
   digitalWrite(PIN_LED_BLUE, HIGH);
-  digitalWrite(PIN_LED_GREEN, o.state == ST_OK ? HIGH : LOW);
-  digitalWrite(PIN_LED_RED,
-               o.state == ST_ALERT ? HIGH : (o.state == ST_FAULT && blink ? HIGH : LOW));
 
-  // Intermittent, not continuous: a solid tone gets taped over within a day.
-  if (o.buzzer && (now_ms % 2000) < 250) tone(PIN_BUZZER, 2000);
+  const bool calm = (now_ms / 500) % 2;                 // 1 Hz, unhurried
+  digitalWrite(PIN_LED_GREEN, (o.state == ST_OK && calm) ? HIGH : LOW);
+
+  // Two short pulses then a gap — the cadence smoke alarms use.
+  const uint32_t phase = now_ms % 1000;
+  const bool alarm = (phase < 120) || (phase >= 220 && phase < 340);
+  digitalWrite(PIN_LED_RED, (o.state == ST_ALERT && alarm) ? HIGH : LOW);
+
+  // Buzzer rides the same pulses so light and sound read as one alarm. It
+  // follows o.buzzer, so muting silences the sound while red keeps flashing.
+  if (o.buzzer && alarm) tone(PIN_BUZZER, 2800);
   else noTone(PIN_BUZZER);
 }
 
