@@ -1,0 +1,7 @@
+# The mock server (ui/serve.py) uses the Python standard library only.
+# Nothing to install to build or preview the dashboard:
+#     python3 ui/serve.py
+#
+# Firmware is built with PlatformIO, which is a Python tool but is best kept
+# out of this project's environment. Install it once, globally:
+#     pipx install platformio        # or: pip install --user platformio

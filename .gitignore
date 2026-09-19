@@ -1,0 +1,24 @@
+# secrets
+.env
+*.pem
+firmware/include/secrets.h
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# venv
+.venv/
+venv/
+env/
+
+# platformio
+.pio/
+firmware/.pio/
+
+# editors / os
+.DS_Store
+.idea/
+.vscode/
