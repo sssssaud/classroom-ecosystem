@@ -2,7 +2,7 @@
 #pragma once
 #include <stdint.h>
 
-// ---- pins (as wired; see docs/pinout.jpeg) ----
+// ---- pins (as wired; see docs/pinout.md) ----
 #define PIN_I2C_SDA   21
 #define PIN_I2C_SCL   22
 #define PIN_MQ135_AO  34   // ADC1 only: ADC2 is unusable while WiFi is on

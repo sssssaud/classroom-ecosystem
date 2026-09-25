@@ -26,7 +26,7 @@ classification, user accounts, cloud upload.
 
 ## Hardware
 
-Pinout as wired (from `docs/pinout.jpeg`):
+Pinout as wired (see `docs/pinout.md`):
 
 | Component | Pin | ESP32 | Notes |
 |---|---|---|---|

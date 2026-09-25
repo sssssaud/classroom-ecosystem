@@ -12,7 +12,7 @@ readings plus three hours of history, with the LEDs matching what the page says.
 No laptop, no server, no cloud.
 
 ## Directory map
-- `docs/pinout.jpeg` — the as-wired pinout photo.
+- `docs/pinout.md` — the as-wired pin table (transcribed from the hand-drawn sheet, reconciled with config.h).
 - `docs/wiring.md` — rails, the MQ-135 divider, and the three wiring quirks this build has.
 - `docs/superpowers/specs/` — the approved design spec.
 - `ui/index.html` — the dashboard. Self-contained; the ESP32 serves this verbatim.

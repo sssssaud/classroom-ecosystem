@@ -5,8 +5,6 @@ relative air quality and noise level. Three LEDs show the room's state at a
 glance, a buzzer fires on a gas alert, and the box serves its own web dashboard
 over WiFi — no laptop, no server, no cloud.
 
-![pinout](docs/pinout.jpeg)
-
 ## What it measures
 
 | Sensor | Reading | Honest limits |
@@ -48,8 +46,8 @@ or `?s=boot` to the URL.
 
 ## Wiring
 
-See `docs/pinout.jpeg` and the table in
-`docs/superpowers/specs/2026-09-19-classroom-ecosystem-design.md`.
+Full pin table: [`docs/pinout.md`](docs/pinout.md). Rails, the I²C cross and
+the other build quirks: [`docs/wiring.md`](docs/wiring.md).
 MQ-135's analog output runs through a 20k/10k divider because it can reach 5V
 and the ESP32's ADC tops out at 3.3V. GPIO34 is on ADC1, which is the only ADC
 that works while WiFi is on.
