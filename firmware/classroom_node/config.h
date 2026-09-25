@@ -24,7 +24,10 @@ static const uint32_t BURN_IN_MS          = 86400000UL; // 24 h; readings are ro
 
 // ---- comfort thresholds; tune these in the real room ----
 static const float TEMP_LO   = 18.0f;
-static const float TEMP_HI   = 30.0f;
+// 18-30 is an air-conditioned office band. This room runs at 30 C in
+// September with the fans on, and the BMP280 sits on the board so it reads
+// a little high. Flagging that as discomfort is noise, not information.
+static const float TEMP_HI   = 34.0f;
 static const float HUM_LO    = 30.0f;
 static const float HUM_HI    = 70.0f;
 static const float NOISE_HI  = 75.0f;   // dB
@@ -59,7 +62,7 @@ static const uint32_t I2S_SAMPLE_RATE = 16000;
 static const uint16_t I2S_FRAMES      = 512;
 // dB here is NOT calibrated SPL. We report dBFS + offset; the offset is a pure
 // fudge factor. Hold a phone sound-level meter next to the box and shift this
-// until the numbers agree. ponytail: one knob beats a calibration routine.
+// until the numbers agree; one knob beats a calibration routine here.
 static const float NOISE_DB_OFFSET = 107.0f;
 
 // ---- history ----

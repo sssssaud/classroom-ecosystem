@@ -11,7 +11,7 @@ over WiFi — no laptop, no server, no cloud.
 
 | Sensor | Reading | Honest limits |
 |---|---|---|
-| BME280 | temperature, humidity, pressure | accurate, also corrects the gas reading |
+| BME280 / BMP280 | temperature, humidity, pressure | BMP280 has no humidity sensor, so humidity is clearly labelled simulated |
 | MQ-135 | **relative** air-quality index | not ppm — see below |
 | INMP441 | noise level in dB | audio is never recorded |
 
@@ -54,6 +54,21 @@ MQ-135's analog output runs through a 20k/10k divider because it can reach 5V
 and the ESP32's ADC tops out at 3.3V. GPIO34 is on ADC1, which is the only ADC
 that works while WiFi is on.
 
+## Firmware
+
+Build and upload with Arduino CLI:
+
+```bash
+arduino-cli compile --fqbn esp32:esp32:esp32 firmware/classroom_node
+arduino-cli upload -p /dev/ttyUSB0 --fqbn esp32:esp32:esp32 firmware/classroom_node
+```
+
+Without `firmware/classroom_node/secrets.h`, the ESP32 starts its own WiFi
+network named `classroom-node`; open `http://192.168.4.1` or
+`http://classroom.local`.
+
 ## Status
 
-Dashboard built and verified. Firmware not yet written.
+Dashboard and firmware are built and verified. MQ-135 still needs 24-48 hours
+of burn-in before its baseline is meaningful; recalibrate in clean air after
+burn-in using the web UI or by sending `c` over serial.

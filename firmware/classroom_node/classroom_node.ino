@@ -45,14 +45,13 @@ static bool ap_mode = false;
 
 // ---------------------------------------------------------------- indicators
 
-// Blue: on whenever the node has power. Green: blinks steadily while the room
-// is normal, dark the instant it is not. Red: a two-pulse alarm cadence, so a
-// gas alert cannot be mistaken for green's calm heartbeat across the room.
+// Blue: on whenever the node has power. Green: solid while the room is normal,
+// dark the instant it is not. Red: a two-pulse alarm cadence, so a gas alert
+// cannot be mistaken for normal across the room.
 static void drawIndicators(const StatusOut& o, uint32_t now_ms) {
   digitalWrite(PIN_LED_BLUE, HIGH);
 
-  const bool calm = (now_ms / 500) % 2;                 // 1 Hz, unhurried
-  digitalWrite(PIN_LED_GREEN, (o.state == ST_OK && calm) ? HIGH : LOW);
+  digitalWrite(PIN_LED_GREEN, (o.state == ST_OK) ? HIGH : LOW);
 
   // Two short pulses then a gap — the cadence smoke alarms use.
   const uint32_t phase = now_ms % 1000;

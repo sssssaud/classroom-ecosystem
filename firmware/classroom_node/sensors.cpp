@@ -146,28 +146,58 @@ bool sensorsBegin() {
   analogSetPinAttenuation(PIN_MQ135_AO, ADC_11db);
 
   // Which slot the INMP441 speaks on depends on how its L/R pin is strapped,
-  // and a mismatch reads as perfect silence rather than as an error. Try both
-  // and keep the one that actually carries samples.
+  // and a mismatch reads as perfect silence rather than as an error. Test both
+  // slots and pick the one with real audio signal (RMS > 1.0).
   i2s_ok = false;
-  for (uint8_t attempt = 0; attempt < 2 && !i2s_ok; ++attempt) {
-    const i2s_std_slot_mask_t slot = attempt ? I2S_STD_SLOT_RIGHT : I2S_STD_SLOT_LEFT;
+  double best_rms = 0.0;
+  i2s_std_slot_mask_t best_slot = I2S_STD_SLOT_RIGHT;
+
+  for (uint8_t attempt = 0; attempt < 2; ++attempt) {
+    // Probe RIGHT first since L/R is tied high on this build, then LEFT
+    const i2s_std_slot_mask_t slot = (attempt == 0) ? I2S_STD_SLOT_RIGHT : I2S_STD_SLOT_LEFT;
     i2s.end();
+    delay(30);
     i2s.setPins(PIN_I2S_BCLK, PIN_I2S_WS, -1, PIN_I2S_DIN, -1);
     if (!i2s.begin(I2S_MODE_STD, I2S_SAMPLE_RATE, I2S_DATA_BIT_WIDTH_32BIT,
                    I2S_SLOT_MODE_MONO, slot)) {
       continue;
     }
     static int32_t probe[256];
-    i2s.readBytes(reinterpret_cast<char*>(probe), sizeof(probe));   // settle
+    i2s.readBytes(reinterpret_cast<char*>(probe), sizeof(probe));   // flush/settle
     delay(30);
     const size_t n = i2s.readBytes(reinterpret_cast<char*>(probe), sizeof(probe))
                      / sizeof(int32_t);
-    for (size_t i = 0; i < n && !i2s_ok; ++i) {
-      if (probe[i] >> 8) i2s_ok = true;
+    if (n < 32) continue;
+
+    double sum = 0.0;
+    for (size_t i = 0; i < n; ++i) sum += double(probe[i] >> 8);
+    const double mean = sum / double(n);
+
+    double sq = 0.0;
+    for (size_t i = 0; i < n; ++i) {
+      const double s = double(probe[i] >> 8) - mean;
+      sq += s * s;
     }
-    if (i2s_ok) Serial.printf("I2S: mic found on %s slot\n", attempt ? "RIGHT" : "LEFT");
+    const double rms = sqrt(sq / double(n));
+    if (rms > best_rms) {
+      best_rms = rms;
+      best_slot = slot;
+    }
   }
-  if (!i2s_ok) Serial.println("I2S: no mic data on either slot (check SD/GPIO33)");
+
+  if (best_rms >= 1.0) {
+    i2s.end();
+    delay(30);
+    i2s.setPins(PIN_I2S_BCLK, PIN_I2S_WS, -1, PIN_I2S_DIN, -1);
+    i2s.begin(I2S_MODE_STD, I2S_SAMPLE_RATE, I2S_DATA_BIT_WIDTH_32BIT,
+              I2S_SLOT_MODE_MONO, best_slot);
+    i2s_ok = true;
+    Serial.printf("I2S: mic found on %s slot (rms=%.1f)\n",
+                  (best_slot == I2S_STD_SLOT_RIGHT) ? "RIGHT" : "LEFT", best_rms);
+  } else {
+    i2s.end();
+    Serial.println("I2S: no mic data on either slot (check SD/GPIO33)");
+  }
 
   prefs.begin("classroom", false);
   r0_ = prefs.getFloat("mq_r0", 0.0f);
@@ -213,14 +243,13 @@ void sensorsRead(Readings& out, uint32_t now_ms) {
       out.v[R_TEMP]  = { t, !isnan(t) };
       out.v[R_PRESS] = { p, !isnan(p) && p > 300.0f && p < 1100.0f };
     }
-    // ponytail: this chip has no humidity die, so that one channel stays
-    // synthetic. channelSimulated() labels it all the way to the dashboard.
+    // This chip has no humidity die, so that one channel stays synthetic.
+    // channelSimulated() labels it all the way to the dashboard.
     out.v[R_HUM] = { drift(now_ms, 52.0f, 7.0f, 660, 90), true };
   } else {
-    // ponytail: nothing answered on the bus and the build has to ship, so the
-    // comfort channel runs on plausible synthetic values instead of three dead
-    // tiles. Every path out of here labels them, and the branch disappears the
-    // moment a real sensor answers at boot.
+    // Nothing answered on the bus, so the comfort channel runs on plausible
+    // synthetic values instead of three dead tiles. Every path out of here
+    // labels them, and the branch disappears when a real sensor answers at boot.
     out.v[R_TEMP]  = { drift(now_ms,   26.0f, 1.6f,  420,   0), true };
     out.v[R_HUM]   = { drift(now_ms,   52.0f, 7.0f,  660,  90), true };
     out.v[R_PRESS] = { drift(now_ms, 1011.0f, 2.2f, 1380, 200), true };
@@ -263,7 +292,7 @@ void sensorsRead(Readings& out, uint32_t now_ms) {
 }
 
 bool  baselineSet()  { return r0_ > 0.0f; }
-// ponytail: raw baseline numbers on the API so the index can be debugged without serial.
+// Raw baseline numbers on the API so the index can be debugged without serial.
 float mqR0()         { return r0_; }
 float mqRsEma()      { return rs_ema_; }
 float baselineR0()   { return r0_; }

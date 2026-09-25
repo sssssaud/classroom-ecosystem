@@ -294,7 +294,7 @@ function renderCharts(hist) {
 
 // Hand-rolled sparkline. A chart library is ~200 KB the ESP32 would have to
 // serve with no internet available; this is 15 lines.
-// ponytail: no y-axis ticks, the tile above carries the number. Add ticks only
+// No y-axis ticks: the tile above carries the number. Add ticks only
 // if reading the exact shape ever matters more than the trend.
 function spark(pts, clean) {
   const W = 300, H = 56;

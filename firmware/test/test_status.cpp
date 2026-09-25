@@ -116,6 +116,18 @@ void test_dead_sensor_is_a_fault_not_a_zero() {
   assert(o.level[R_TEMP] == LVL_OFFLINE);
 }
 
+void test_dead_mic_does_not_hide_normal_room() {
+  StatusEngine e(T);
+  uint32_t t = 0;
+  settle(e, calm(), t);
+
+  Readings r = calm();
+  r.v[R_NOISE].valid = false;
+  StatusOut o = settle(e, r, t);
+  assert(o.state == ST_OK);
+  assert(o.level[R_NOISE] == LVL_OFFLINE);
+}
+
 void test_gas_alert_outranks_fault() {
   StatusEngine e(T);
   uint32_t t = 0;
@@ -175,6 +187,7 @@ int main() {
   test_gas_alert_and_release();
   test_mute_silences_sound_only();
   test_dead_sensor_is_a_fault_not_a_zero();
+  test_dead_mic_does_not_hide_normal_room();
   test_gas_alert_outranks_fault();
   test_missing_baseline_is_not_a_fault();
   test_history_encoding();

@@ -49,7 +49,9 @@ StatusOut StatusEngine::update(const Readings& r, uint32_t now_ms, bool baseline
     if (lv == LVL_ALERT) any_alert = true;
     else if (lv == LVL_WARN) any_warn = true;
     // A missing air index without a baseline is expected, not a wiring fault.
-    else if (lv == LVL_OFFLINE && !(id == R_AIR && !baseline_set)) any_fault = true;
+    // Noise is useful, but not safety-critical; a dead mic should show as "no
+    // response" on the dashboard without turning the classroom status red.
+    else if (lv == LVL_OFFLINE && !(id == R_AIR && !baseline_set) && id != R_NOISE) any_fault = true;
   }
 
   // Gas outranks a dead sensor: a real hazard must not be masked by a fault

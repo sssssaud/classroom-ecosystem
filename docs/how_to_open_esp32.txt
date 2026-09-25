@@ -1,0 +1,35 @@
+ESP32 Classroom Monitor - kaise open karna hai
+
+1. ESP32 ko power do
+   - USB cable se phone charger, power bank, ya laptop me laga do.
+   - 10-20 seconds wait karo.
+
+2. LEDs dekho
+   - Blue ON = ESP32 chal raha hai.
+   - Green solid ON = normal state.
+   - Red blink + buzzer = gas/air alert.
+
+3. ESP32 ka hotspot connect karo
+   - Phone/laptop ki WiFi settings kholo.
+   - WiFi name dhundo: classroom-node
+   - Is WiFi se connect ho jao.
+   - Password nahi hai, agar phone warning de "No internet", tab bhi connected rehna.
+
+4. Dashboard open karo
+   - Browser kholo: Chrome/Safari/Firefox.
+   - Address bar me likho:
+
+     http://192.168.4.1
+
+   - Agar ye na khule, ye try karo:
+
+     http://classroom.local
+
+5. Important
+   - ESP32 hotspot internet nahi deta. Ye normal hai.
+   - Phone bole "No internet" to mobile data par switch mat karna.
+   - WiFi classroom-node se connected rehna zaroori hai.
+
+6. MQ135 calibration
+   - Clean air me dashboard ka Calibrate button dabao.
+   - MQ135 ko best readings ke liye 24-48 hours burn-in chahiye.
