@@ -27,12 +27,18 @@ or transmitted.
 
 | LED | Meaning |
 |---|---|
-| Blue blinking | connecting to WiFi |
-| Blue solid | running and reachable |
-| Green solid | room normal |
-| Green blinking | warning — something outside comfort range |
-| Red solid | gas alert, buzzer active |
-| Red blinking | sensor fault |
+| Blue solid | powered — on for as long as the box has power |
+| Green solid | room normal: every channel inside its band |
+| Red, two short pulses a second | gas alert — the air index is above the alert threshold |
+| All three off except blue | warning or sensor fault — read the dashboard for which |
+
+The buzzer rides the red LED's exact cadence, so the light and the sound read
+as one alarm. Muting silences the buzzer only; the red LED keeps flashing
+until the air clears.
+
+The thresholds that drive this live in `firmware/classroom_node/config.h`.
+The comfort band is 18–34 °C, set for a classroom without air conditioning —
+an air-conditioned room should lower `TEMP_HI`.
 
 ## Run the dashboard without hardware
 
